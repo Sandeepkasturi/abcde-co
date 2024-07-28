@@ -1,4 +1,6 @@
 streamlit
+streamlit-lottie
+streamlit-ace
 requests
 google
 ipython
