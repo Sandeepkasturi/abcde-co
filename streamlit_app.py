@@ -5,8 +5,6 @@ from streamlit_ace import st_ace
 import requests
 import base64
 from google.generativeai import configure, GenerativeModel
-from streamlit_lottie import st_lottie
-import streamlit.components.v1 as components
 import re
 import time
 from PIL import Image
@@ -15,12 +13,6 @@ from PIL import Image
 configure(api_key=st.secrets["api_key"])
 model = GenerativeModel('gemini-pro')
 
-# Lottie animation loader
-def load_lottie_url(url: str):
-    response = requests.get(url)
-    if response.status_code != 200:
-        return None
-    return response.json()
 
 # Function to download generated code
 def download_generated_code(content, filename, format='txt'):
@@ -35,6 +27,7 @@ def download_generated_code(content, filename, format='txt'):
     st.markdown(href, unsafe_allow_html=True)
     os.remove(temp_filename)
 
+
 # Function to get AI-generated explanations for errors
 def get_ai_explanation(error_message):
     try:
@@ -44,14 +37,42 @@ def get_ai_explanation(error_message):
     except Exception as e:
         return f"An unexpected error occurred while generating an explanation: {e}"
 
-# Function to simulate AI pretend code compiler
+
+# Function to simulate AI pretend code compiler for Python and Java
 def ai_pretend_compiler(language, code):
     try:
-        prompt = f"Simulate the execution of the following {language} code and provide the expected output:\n\n{code}"
+        if language == "Python":
+            prompt = f"""Pretend you are a real Python interpreter and execute the following Python code. Provide the exact output as it would appear if run on an actual Python interpreter.
+
+If there are any errors, please:
+- Identify the type of error (e.g., syntax error, runtime exception).
+- Describe where the error occurs in the code.
+- Suggest a fix for the error.
+
+Here is the Python code to evaluate:
+\n\n{code}
+
+What is the expected output of the code?
+"""
+        elif language == "Java":
+            prompt = f"""Pretend you are a real JVM and execute the following Java code. Provide the exact output as it would appear if run on an actual JVM.
+
+If there are any errors, please:
+- Identify the type of error (e.g., syntax error, runtime exception).
+- Describe where the error occurs in the code.
+- Suggest a fix for the error.
+
+Here is the Java code to evaluate:
+\n\n{code}
+
+What is the expected output of the code?
+"""
+
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         return f"An unexpected error occurred while generating the pretend output: {e}"
+
 
 # Function to detect I/O operations in the code
 def contains_io_operations(language, code):
@@ -75,10 +96,14 @@ def contains_io_operations(language, code):
             return True
     return False
 
+
 # Function to compile and run the code
 def run_code(language, code, filename):
     if contains_io_operations(language, code):
-        return ai_pretend_compiler(language, code), "Detected I/O operations! Using AI Compiler for results."
+        io_message = "I/O Detected"
+        ai_compiler_message = "Using AI to Simulate Output"
+        ai_output = ai_pretend_compiler(language, code)
+        return ai_output, f"{io_message}\n{ai_compiler_message}"
 
     try:
         start_time = time.time()
@@ -93,44 +118,19 @@ def run_code(language, code, filename):
             )
             elapsed_time = time.time() - start_time
             if elapsed_time > 10:
-                return ai_pretend_compiler(language, code), "Execution took too long. Here is the simulated output."
+                return ai_pretend_compiler(language, code), "Execution took too long. Using AI Compiler for results."
             return result.stdout, result.stderr
 
         elif language == "Java":
-            # Write the code to a file
-            with open(filename, "w", encoding='utf-8') as f:
-                f.write(code)
-            # Check if the file was created successfully
-            if not os.path.exists(filename):
-                return "", f"File not found: {filename}"
-            # Compile the Java code
-            compile_result = subprocess.run(
-                ["javac", filename],
-                capture_output=True,
-                text=True,
-                timeout=20
-            )
-            if compile_result.returncode != 0:
-                return "", compile_result.stderr
-            # Run the compiled Java class
-            class_name = filename.split(".")[0]
-            java_args = [arg1, arg2]
-            result = subprocess.run(
-                ["java", class_name] + java_args,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            elapsed_time = time.time() - start_time
-            if elapsed_time > 10:
-                return ai_pretend_compiler(language, code), "Execution took too long. Here is the simulated output."
-            return result.stdout, result.stderr
+            # Simulate Java code execution using AI
+            return ai_pretend_compiler(language, code), ""
     except subprocess.TimeoutExpired:
         return ai_pretend_compiler(language, code), "Execution timed out! Using AI Compiler for results."
     except FileNotFoundError as e:
         return "", f"File not found: {e.filename}"
     except Exception as e:
         return "", f"An unexpected error occurred: {e}"
+
 
 # Function to install Python packages
 def install_package(package):
@@ -147,8 +147,34 @@ def install_package(package):
     except Exception as e:
         return f"An error occurred: {e}"
 
+
 # Set up the Streamlit page
 st.set_page_config(page_title="Autobot Code Compiler", page_icon="💻")
+
+# Custom CSS for console-like styling
+st.markdown(
+    """
+    <style>
+    .generated-content {
+        background-color: #1e1e1e;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+        color: #61dafb;
+        font-family: "Courier New", Courier, monospace;
+    }
+    .error-content {
+        background-color: #1e1e1e;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+        color: #ff0000;
+        font-family: "Courier New", Courier, monospace;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Title of the application
 st.title("ABCDE & CO")
@@ -173,12 +199,12 @@ if page == "Home":
     default_code = {
         "Python": "print('Hello, World!')",
         "Java": """
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
+    public class Main {
+        public static void main(String[] args) {
+            System.out.println("Hello, World!");
+        }
     }
-}
-"""
+    """
     }
 
     # Initialize session state if not already done
@@ -193,7 +219,7 @@ public class Main {
         st.session_state.language = language
         st.session_state.code = default_code[language]
         st.session_state.saved_code = default_code[language]  # Reset saved code on language change
-        st.session_state.filename = "hello.py" if language == "Python" else "Main.java"
+        st.session_state.filename = "main.py" if language == "Python" else "Main.java"
 
     # Display the code editor with the appropriate code
     st.info("Write code here according to the Selected Language.")
@@ -214,10 +240,12 @@ public class Main {
             class_name = class_name_match.group(1)
             st.session_state.filename = f"{class_name}.java"
 
+
     # Function to save the current code
     def save_code():
         st.session_state.saved_code = code
         st.success("Code saved successfully!")
+
 
     # Add a button to save the code
     if st.button("Save Code"):
@@ -250,107 +278,27 @@ public class Main {
         with st.spinner("Running..."):
             stdout, stderr = run_code(language, code, filename)
 
-        st.subheader("Output:")
-        st.text(stdout)
+        # Display output and errors
+        if stderr and "I/O Detected" in stderr:
+            st.markdown(
+                """
+                <div style="background-color: #282c34; color: #61dafb; padding: 10px; border-radius: 5px;">
+                    <h3 style="color: red;">I/O Detected</h3>
+                   <b>* Using AI to Simulate Output...<b>
 
-        if stderr:
-            st.subheader("Errors:")
-            st.text(stderr)
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            # Display the AI-simulated output
+            st.subheader("Output:")
+            st.markdown(f"<div class='generated-content'>{stdout}</div>", unsafe_allow_html=True)
 
-            if "Using AI Compiler for results." not in stderr:
-                # Optional: Show animation
-                lottie_url = "https://lottie.host/fb24aa71-e6dd-497e-8a6c-3098cb64b1ed/V9N1Sd3klS.json"
-                lottie_animation = load_lottie_url(lottie_url)
-                if lottie_animation:
-                    st_lottie(lottie_animation, speed=27, width=150, height=100, key="lottie_animation")
-                else:
-                    st.error("Failed to load Lottie animation.")
+        else:
+            st.subheader("Output:")
+            st.markdown(f"<div class='generated-content'>{stdout}</div>", unsafe_allow_html=True)
 
-                # Generate AI explanation for the error with a spinner
-                with st.spinner("Generating AI explanation..."):
-                    ai_explanation = get_ai_explanation(stderr)
-                st.subheader("AI Explanation:")
-                st.text(ai_explanation)
+            if stderr:
+                st.subheader("Errors:")
+                st.markdown(f"<div class='error-content'>{stderr}</div>", unsafe_allow_html=True)
 
-            # Allow user to download generated code
-            if st.button("Download Generated Code"):
-                download_generated_code(ai_explanation, "generated_code")
-
-    # Python Package Installation
-    if language == "Python":
-        st.subheader("Install Python Packages")
-        package_name = st.text_input("Enter the package name:")
-        if st.button("Install Package"):
-            result = install_package(package_name)
-            st.text(result)
-
-    # Donation Section
-    st.markdown("### Support Us")
-    st.markdown("If you find this tool useful, please consider supporting us by making a donation.")
-    components.html("""
-        <form>
-            <script src="https://checkout.razorpay.com/v1/payment-button.js" data-payment_button_id="pl_Oe7PyEQO3xI82m" async> </script>
-        </form>
-    """, height=600, width=300)  # Adjust the height if necessary
-
-elif page == "About":
-    st.header("About Autobot Code Compiler")
-    st.info("""
-        **Autobot Code Compiler** is an advanced tool designed to help developers write, debug, and compile code seamlessly. 
-        With support for multiple programming languages like Python and Java, it leverages the power of AI to provide instant feedback and solutions for code errors.
-    """)
-    st.subheader("How to Use This App")
-    st.write("""
-        1. **Select Language**: Choose the programming language you want to work with from the dropdown menu.
-        2. **Write Code**: Use the code editor to write your code. The editor supports syntax highlighting for the selected language.
-        3. **Save Code**: Save your code using the 'Save Code' button to ensure your changes are not lost.
-        4. **Run Code**: Click the 'Run Code' button to compile and execute your code. The output and any errors will be displayed below.
-        5. **Install Packages (Python)**: For Python, you can install additional packages by entering the package name and clicking 'Install Package'.
-    """)
-
-elif page == "Our Company":
-    st.header("About SKAV TECH")
-    st.write("""
-        **SKAV TECH** is a cutting-edge technology company specializing in NO CODE and Low Code application development using Prompt Engineering and leveraging AI.
-        Our mission is to make software development accessible to everyone, regardless of their technical background.
-    """)
-    st.write("""
-        **Founder**: Sandeep Kasturi
-        - [Company](https://skavtech.wegic.app)
-        - [Instagram](https://instagram.com/sandeep_kasturi_)
-        - [GitHub](https://github.com/Sandeepkasturi)
-    """)
-
-elif page == "Support":
-    st.header("Support Us")
-    st.write("""
-        At **SKAV TECH**, our vision is to empower developers and non-developers alike with the tools they need to create powerful applications effortlessly.
-        We are always looking for investments to grow and improve our offerings. If you believe in our mission, please consider supporting us.
-    """)
-    if st.button("Support Us"):
-        components.html("""
-            <form>
-                <script src="https://checkout.razorpay.com/v1/payment-button.js" data-payment_button_id="pl_Oe7PyEQO3xI82m" async> </script>
-            </form>
-        """, height=600, width=300)  # Adjust the height if necessary
-
-        st.write("Thank you for your support!")
-
-elif page == "Become Insider":
-    st.header("Become an Insider at SKAV TECH")
-    st.write("""
-        We are hiring!
-
-        **Positions Available**:
-        - Prompt Engineers
-        - ChatGPT Experts
-        - Large Language Model Experts
-
-        Join us and be part of a dynamic team at the forefront of AI and Prompt Engineering technology.
-    """)
-    st.write("""
-        **Founder**: Sandeep Kasturi
-        - [Company](https://skavtech.wegic.app)
-        - [Instagram](https://instagram.com/sandeep_kasturi_)
-        - [GitHub](https://github.com/Sandeepkasturi)
-    """)
