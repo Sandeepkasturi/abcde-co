@@ -161,6 +161,7 @@ st.markdown("AutoBot Code Development Environment & Computational Optimization.(
 st.subheader("Autobot Code Compiler")
 # Sidebar for navigation
 st.sidebar.title("Navigation")
+st.markdown("**Developed by SANDEEP KASTURI**")
 st.sidebar.image("abcde2.png")
 page = st.sidebar.selectbox("Go to", ["Home", "About", "Our Company", "Support", "Become Insider"])
 
