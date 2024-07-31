@@ -95,10 +95,14 @@ def run_code(language, code, filename):
             if elapsed_time > 10:
                 return ai_pretend_compiler(language, code), "Execution took too long. Here is the simulated output."
             return result.stdout, result.stderr
+
         elif language == "Java":
             # Write the code to a file
             with open(filename, "w", encoding='utf-8') as f:
                 f.write(code)
+            # Check if the file was created successfully
+            if not os.path.exists(filename):
+                return "", f"File not found: {filename}"
             # Compile the Java code
             compile_result = subprocess.run(
                 ["javac", filename],
@@ -123,6 +127,10 @@ def run_code(language, code, filename):
             return result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return ai_pretend_compiler(language, code), "Execution timed out! Using AI Compiler for results."
+    except FileNotFoundError as e:
+        return "", f"File not found: {e.filename}"
+    except Exception as e:
+        return "", f"An unexpected error occurred: {e}"
 
 # Function to install Python packages
 def install_package(package):
